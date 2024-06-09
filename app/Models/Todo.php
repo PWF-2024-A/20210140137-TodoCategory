@@ -12,12 +12,12 @@ class Todo extends Model
 
     protected $guarded = ['id'];
 
-    // protected $fillable = [
+     protected $casts = [
     //     'title',
     //     'user_id',
     //     'category_id',
-    //     'is_complete',
-    // ];
+         'is_complete' => 'boolean',
+     ];
 
     public function user(): BelongsTo
     {
