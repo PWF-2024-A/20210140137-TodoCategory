@@ -9,12 +9,12 @@ class Category extends Model
 {
     use HasFactory;
 
-    protected $guarded = ['id'];
+    // protected $guarded = ['id'];
 
-    // protected $fillable = [
-    //     'title',
-    //     'user_id',
-    // ];
+     protected $fillable = [
+         'title',
+         'user_id',
+     ];
 
     public function todos()
     {

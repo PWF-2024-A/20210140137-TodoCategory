@@ -5,6 +5,8 @@ namespace App\Http\Controllers\API;
 use App\Http\Controllers\Controller;
 use App\Models\Todo;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 
 class TodoController extends Controller
 {
@@ -57,7 +59,38 @@ class TodoController extends Controller
      */
     public function store(Request $request)
     {
-        //
+        try{
+            $request->validate([
+                'title' => 'required|max:255',
+                'category_id' => [
+                    'nullable',
+                    Rule::exists('categories', 'id')->where(function ($query){
+                        $query->where('user_id', auth()->user()->id);
+                    })
+                ]
+                ]);
+                $todo = Todo::create([
+                    'title' => ucfirst($request->title),
+                    'user_id' => auth()->user()->id,
+                    'category_id' => $request->category_id
+                ]);
+                $todo = Todo::with('category')
+                ->where('id', $todo->id)
+                ->first();
+                return response()->json([
+                    'status' => 'success',
+                    'message' => 'Todo created',
+                    'data' => [
+                        'todo' => $todo,
+                    ]
+                    ], 201);
+        } catch(ValidationException $exception){
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Validation failed',
+                'errors' => $exception->errors(),
+            ], 422);
+        }
     }
 
     /**
@@ -97,7 +130,43 @@ class TodoController extends Controller
      */
     public function update(Request $request, Todo $todo)
     {
-        //
+        try{
+            $request->validate([
+                'title' => 'required|max:255',
+                'category_id' => [
+                    'nullable',
+                    Rule::exists('categories', 'id')->where(function($query) {
+                        $query->where('user_id', auth()->user()->id);
+                    })
+                ]
+                ]);
+                if(auth()->user()->id !== $todo->user_id) {
+                    return response()->json([
+                        'status' => 'error',
+                        'message' => 'Forbidden'
+                    ], 403);
+                }
+                $todo->update([
+                    'title' => ucfirst($request->title),
+                    'category_id' => $request->category_id
+                ]);
+                $todo = Todo::with('category')
+                ->where('id', $todo->id)
+                ->first();
+                return response()->json([
+                    'status' => 'success',
+                    'message' => 'Todo Updated',
+                    'data' => [
+                        'todo' => $todo,
+                    ]
+                    ], 200);
+        } catch(ValidationException $exception) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Validation Failed',
+                'errors' => $exception->errors(),
+            ], 422);
+        }
     }
 
     /**
@@ -105,6 +174,83 @@ class TodoController extends Controller
      */
     public function destroy(Todo $todo)
     {
-        //
+        if (auth()->user()->id !== $todo->user_id){
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Forbidden'
+            ], 403);
+        }
+        $todo->delete();
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Todo Deleted'
+        ], 200);
+    }
+
+    public function complete(Todo $todo)
+    {
+        if (auth()->user()->id !== $todo->user_id){
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Forbidden'
+            ], 403);
+        }
+        $todo->update([
+            'is_complete' => true
+        ]);
+        $todo = Todo::with('category')
+        ->where('id', $todo->id)
+        ->first();
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Todo Completed',
+            'data' => [
+                'todo' => $todo,
+            ]
+            ], 200);
+    }
+
+    public function uncomplete(Todo $todo)
+    {
+        if (auth()->user()->id !== $todo->user_id){
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Forbidden'
+            ], 403);
+        }
+        $todo->update([
+            'is_complete' => false
+        ]);
+        $todo = Todo::with('category')
+        ->where('id', $todo->id)
+        ->first();
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Todo Uncompleted',
+            'data' => [
+                'todo' => $todo,
+            ]
+            ], 200);
+    }
+
+    public function deleteAllCompleted(){
+        $todos = Todo::where('user_id', auth()->user()->id)
+        ->where('is_complete', true)
+        ->get();
+
+        if($todos->count() == 0){
+            return response()->json([
+                'status' => 'error',
+                'message' => 'No Complete Todos Found'
+            ], 404);
+        }
+
+        foreach($todos as $todo){
+            $todo->delete();
+        }
+        return response()->json([
+            'status' => 'success',
+            'message' => '' . $todos->count() . 'Complete Todos Deleted',
+        ], 200);
     }
 }
